@@ -14,6 +14,12 @@ It finds the nodes it drives by a **role tag** at the start of each node's Comfy
 the workflow can be renumbered, rewired and extended without touching any code. See
 [Modifying the workflow](#modifying-the-workflow).
 
+![The HARMON3 main window](docs/main-window.png)
+
+*References on the left with their prompt tags, the viewer and prompt editor in the middle,
+parameters and run controls on the right. Every screenshot here uses synthetic placeholder
+media.*
+
 ---
 
 ## Requirements
@@ -101,6 +107,12 @@ The readout beside the slider always says what will actually be sent.
 Your files are never modified. A resized copy is prepared before the run and swapped in on
 the way to the server, so the row, your scenes and your settings always name the original.
 
+<img src="docs/references.png" alt="The references panel" width="440">
+
+*Each row states what will actually be sent. `<Picture 3>` is capped at 70%, so it reads
+`512x704 - 0.36 MP (from 750x1000)`. The video row is marked at frame 48 and set to Pose,
+so it says which frames go and that a skeleton goes in place of the clip.*
+
 ### Marking the section
 
 Click a reference and it opens in the result frame with the timeline under it, **paused on
@@ -138,6 +150,8 @@ moving any of those re-renders and touching none of them costs nothing. The thum
 beside the source shows the skeleton once there is one; click it to watch, or click it
 before there is one to render it there and then.
 
+![The three pose styles](docs/pose-styles.png)
+
 Settings offers three estimators — **ViTPose-L** (default), **ViTPose-B** (faster, looser)
 and **ViTPose-L wholebody** (adds face, hands and feet) — and three drawing styles:
 
@@ -168,7 +182,14 @@ the model resolves a label by matching the string, so a mistyped one silently st
 referring to anything. *Helpers* hides the rows; *Guide* opens the format spec beside the
 editor.
 
+![The prompt editor](docs/prompt.png)
+
 ### Parameters
+
+<img src="docs/parameters.png" alt="The parameters panel" width="425">
+
+Computed values are shown live as you type: *Output* is the snapped pixel size, *Actual*
+the frame count the model will really receive and what that is in seconds.
 
 | | |
 |---|---|
