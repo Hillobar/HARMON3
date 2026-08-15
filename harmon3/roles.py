@@ -99,7 +99,11 @@ ROLES: tuple[RoleSpec, ...] = (
              "sends the live sampler preview; without it the app runs without previews"),
     RoleSpec("sage", ("PathchSageAttentionKJ",), False, False,
              "the Sage Attention patch; without it the Settings toggle does nothing"),
-    RoleSpec("switch", ("Switch",), False, False,
+    # ComfyUI's own logic node first; "Switch" is the ComfyUI-ConditioningKrea2Rebalance
+    # one the workflow used to carry. Both take the same three inputs, so the builder does
+    # not care which is present -- but the core node evaluates its branches lazily and the
+    # pack's does not. See graph_builder._apply_sage.
+    RoleSpec("switch", ("ComfySwitchNode", "Switch"), False, False,
              "chooses between the patched and unpatched model"),
 
     # Reference loaders baked into the workflow. Always pruned by the builder; their

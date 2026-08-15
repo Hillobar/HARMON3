@@ -471,11 +471,20 @@ def _strip_frontend_inputs(graph: dict) -> None:
 def _apply_sage(graph: dict, roles, enabled: bool) -> None:
     """Point the model chain through the Sage patch, or around it entirely.
 
-    Setting the switch alone would not be enough: `Switch` wires *both* branches, so the
-    patch node stays an ancestor of an output and ComfyUI executes it either way -- and it
-    is configured with `allow_compile`, which is not something to run for a setting that is
-    switched off. Repointing the switch's consumers at the loader instead leaves the patch
-    node and the switch feeding nothing, and the orphan sweep takes them out.
+    Repointing rather than only setting the flag, because whether the flag is enough
+    depends on which switch node the workflow carries, and the builder should not have to
+    know:
+
+    * ComfyUI's own ``ComfySwitchNode`` declares both branches ``lazy=True`` and asks for
+      only the one it took, so the patch really is skipped.
+    * ``Switch`` from ComfyUI-ConditioningKrea2Rebalance, which this workflow used to
+      carry, wires both branches eagerly -- the patch node stays an ancestor of an output
+      and ComfyUI executes it either way. It is configured with ``allow_compile``, which is
+      not something to run for a setting that is switched off.
+
+    Repointing the switch's consumers at the loader is correct for both: it leaves the
+    patch node and the switch feeding nothing, and the orphan sweep takes them out, so the
+    graph that goes to the server contains only what it is actually going to use.
     """
     switch_id = roles.optional("switch")
     if switch_id is None:
@@ -695,13 +704,18 @@ def intended_difference_ids(roles) -> dict:
 def canonical_reference(base: dict, roles) -> dict:
     """The shipped workflow in the form a faithful rebuild should match.
 
-    The same orphan sweep is applied to both sides, so nodes the builder drops because
-    ComfyUI would never execute them do not read as changes the app made.
+    The same strip, the same Sage decision and the same orphan sweep are applied to both
+    sides, so nothing the builder drops because ComfyUI would never execute it reads as a
+    change the app made. The Sage decision belongs here because it is the *workflow's* --
+    a first launch takes `sage_attention` from the switch node's own value, so a workflow
+    shipping `switch: false` is one whose faithful rebuild routes around the patch.
     """
     reference = copy.deepcopy(base)
     # The same strip as the build, so a key the frontend wrote and the app drops does not
     # read as a change the app made.
     _strip_frontend_inputs(reference)
+    _apply_sage(reference, roles,
+                bool(config.defaults_from_workflow(base, roles)["sage_attention"]))
     prune_orphans(reference, keep=(roles.vidcombine,) + roles.keep)
     return canonicalise(reference, roles)
 

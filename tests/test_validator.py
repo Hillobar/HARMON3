@@ -188,6 +188,30 @@ def test_multi_type_input_accepts_any_member():
     assert validator.validate(_minimal_graph(), OBJECT_INFO).ok
 
 
+def test_a_match_type_is_not_compared_against_a_real_one():
+    """ComfySwitchNode declares its branches and its output as COMFY_MATCHTYPE_V3, resolved
+    from whatever is connected. /object_info reports the placeholder, so comparing against
+    it fails a graph that is entirely correct -- in both directions, since the node both
+    accepts and produces one."""
+    info = dict(OBJECT_INFO)
+    info["ComfySwitchNode"] = {
+        "input": {"required": {
+            "switch": ["BOOLEAN", {}],
+            "on_false": [validator.MATCHTYPE, {"lazy": True}],
+            "on_true": [validator.MATCHTYPE, {"lazy": True}],
+        }},
+        "output": [validator.MATCHTYPE],
+    }
+    graph = _minimal_graph(**{
+        "4": {"class_type": "UNETLoader",
+              "inputs": {"unet_name": "present.safetensors", "weight_dtype": "default"}},
+        "5": {"class_type": "ComfySwitchNode",
+              "inputs": {"switch": False, "on_false": ["4", 0], "on_true": ["4", 0]}},
+        "6": {"class_type": "PreviewAny", "inputs": {"source": ["5", 0]}},
+    })
+    assert validator.validate(graph, info).ok
+
+
 def test_numeric_bounds_are_enforced():
     graph = _minimal_graph(**{
         "4": {"class_type": "MiniMaxH3ReferenceToVideo", "inputs": {

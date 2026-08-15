@@ -42,10 +42,11 @@ anything missing before a run rather than during one.
 | [ComfyUI-Hillobar](https://github.com/Hillobar) | `MiniMaxH3ProgressiveSampler` |
 | [ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite) | `VHS_LoadVideo`, `VHS_VideoCombine` |
 | [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes) | `ModelPreviewOverrideKJ`, `PathchSageAttentionKJ` |
-| ComfyUI-ConditioningKrea2Rebalance | `Switch` — easy to miss; it is the only thing this pack is needed for |
 
-`MiniMaxH3ReferenceToVideo` and `MiniMaxH3SigmaShift` are **core ComfyUI**
-(`comfy_extras/nodes_minimax_h3.py`), as is everything else in the graph.
+Everything else in the graph is **core ComfyUI** — including
+`MiniMaxH3ReferenceToVideo` and `MiniMaxH3SigmaShift`
+(`comfy_extras/nodes_minimax_h3.py`) and the `ComfySwitchNode` behind the Sage toggle
+(`comfy_extras/nodes_logic.py`, marked experimental).
 
 Model files, under ComfyUI's usual folders — the workflow names these, and any of them can
 be repointed in ComfyUI without touching this app:
@@ -208,9 +209,12 @@ marks it and the affected rows block the queue rather than failing at submit.
 **Settings.** The third tab holds the storage locations, the ComfyUI address, and
 **Sage Attention** — the switch the workflow carries. On, the model goes through
 `PathchSageAttentionKJ`; off, the patch node is left out of the submitted graph entirely
-rather than included and bypassed, because `Switch` wires both branches and ComfyUI would
-otherwise still run it. It needs the sageattention library where ComfyUI runs, and takes
-effect on the next run.
+rather than included and bypassed. That is deliberately stronger than flipping the switch,
+because whether flipping it is enough depends on which switch node the workflow uses: core
+ComfyUI's `ComfySwitchNode` evaluates its branches lazily and really does skip the patch,
+while some third-party switches wire both branches and ComfyUI runs them either way.
+Taking the node out is correct for both. Sage needs the `sageattention` library where
+ComfyUI runs, and takes effect on the next run.
 
 **Pose settings** live there too: which weights the *Pose* toggle uses (ViTPose-L,
 ViTPose-B, or the wholebody variant that adds face, hands and feet), how the keypoints are

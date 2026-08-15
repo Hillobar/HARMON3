@@ -17,6 +17,14 @@ from . import config
 AUTOGROW = "COMFY_AUTOGROW_V3"
 WILDCARD = "*"
 
+#: A V3 node whose input and output types are decided by what is connected to them, rather
+#: than declared. `/object_info` reports the placeholder itself, so a static comparison
+#: against it is meaningless -- `ComfySwitchNode` reads as "expects COMFY_MATCHTYPE_V3 but
+#: UNETLoader produces MODEL" on a graph that is entirely correct. The server resolves the
+#: template and enforces that its members agree, which is the check that can actually be
+#: made; treating it as a wildcard here defers to that rather than inventing a worse one.
+MATCHTYPE = "COMFY_MATCHTYPE_V3"
+
 
 @dataclass
 class ValidationReport:
@@ -151,7 +159,7 @@ def combo_options(object_info: dict, class_type: str, input_name: str) -> list:
 def _types_compatible(produced: str, expected: str) -> bool:
     if not produced or not expected:
         return True
-    if WILDCARD in (produced, expected):
+    if WILDCARD in (produced, expected) or MATCHTYPE in (produced, expected):
         return True
     produced_set = {t.strip() for t in produced.split(",")}
     expected_set = {t.strip() for t in expected.split(",")}

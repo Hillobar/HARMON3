@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import sys
 from pathlib import Path
 
@@ -10,6 +11,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from harmon3 import config, graph_builder, mathmirror, prompt  # noqa: E402
+from harmon3 import roles as roles_mod                         # noqa: E402
 from harmon3.graph_builder import (                           # noqa: E402
     BuildState,
     build_graph,
@@ -653,15 +655,24 @@ def test_preview_override_settings_are_left_as_the_workflow_defines_them():
     assert inputs["suppress_default_preview"] is True
 
 
-def test_nothing_is_pruned_from_a_default_build():
-    """Every node in the shipped workflow feeds the output; the app adds none it drops."""
-    built = build_graph(BASE, state_from_workflow(BASE, ROLES), ROLES)
-    assert built.pruned == []
+def test_a_default_build_prunes_only_what_the_workflow_switched_off():
+    """The app adds no node it then drops. The one thing a default build does drop is the
+    Sage pair, and only when the shipped workflow's own switch says so -- turn it on and
+    every node in the workflow feeds the output."""
+    state = state_from_workflow(BASE, ROLES)
+    dead = set() if state.sage_attention else {ROLES.sage, ROLES.switch}
+    built = build_graph(BASE, state, ROLES)
+    assert {entry.split()[0] for entry in built.pruned} == dead
+
+    state.sage_attention = True
+    assert build_graph(BASE, state, ROLES).pruned == []
 
 
 def test_turning_sage_off_takes_the_patch_out_of_the_graph():
-    """Setting the switch alone would leave the patch node an ancestor of the output, so
-    ComfyUI would still run it -- with allow_compile on."""
+    """Repointing rather than only setting the flag, because whether the flag alone is
+    enough depends on which switch node the workflow carries -- ComfyUI's own evaluates its
+    branches lazily, the pack's leaves the patch an ancestor of the output and runs it with
+    allow_compile on. Taking it out is correct for both."""
     built = build_graph(BASE, BuildState(sage_attention=False), ROLES)
     classes = {n["class_type"] for n in built.graph.values()}
 
@@ -681,7 +692,27 @@ def test_leaving_sage_on_keeps_the_workflows_own_wiring():
 
 
 def test_the_switch_starts_where_the_workflow_left_it():
-    assert state_from_workflow(BASE, ROLES).sage_attention is True
+    """Read from the workflow rather than asserted against a constant: the shipped value is
+    the workflow author's to change, and only a first launch consults it anyway."""
+    assert (state_from_workflow(BASE, ROLES).sage_attention
+            is bool(BASE[ROLES.switch]["inputs"]["switch"]))
+
+
+@pytest.mark.parametrize("class_type", ["ComfySwitchNode", "Switch"])
+def test_either_switch_implementation_is_driven_the_same_way(class_type):
+    """ComfyUI's own logic node and the ComfyUI-ConditioningKrea2Rebalance one it replaced
+    take the same three inputs, so nothing here needs to know which is present."""
+    workflow = copy.deepcopy(BASE)
+    workflow[ROLES.switch]["class_type"] = class_type
+    roles = roles_mod.resolve(workflow)
+
+    off = build_graph(workflow, BuildState(sage_attention=False), roles)
+    assert roles.switch not in off.graph
+    assert off.graph[roles.shift]["inputs"]["model"] == [roles.loadmodel, 0]
+
+    on = build_graph(workflow, BuildState(sage_attention=True), roles)
+    assert on.graph[roles.switch]["inputs"]["switch"] is True
+    assert on.graph[roles.switch]["class_type"] == class_type
 
 
 def test_a_frontend_only_key_is_not_submitted():

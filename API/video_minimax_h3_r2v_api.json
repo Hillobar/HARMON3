@@ -142,23 +142,6 @@
       "title": "h3-sage"
     }
   },
-  "149": {
-    "inputs": {
-      "switch": true,
-      "on_true": [
-        "147",
-        0
-      ],
-      "on_false": [
-        "127",
-        0
-      ]
-    },
-    "class_type": "Switch",
-    "_meta": {
-      "title": "h3-switch"
-    }
-  },
   "154": {
     "inputs": {
       "frame_rate": 24,
@@ -188,9 +171,9 @@
   "155": {
     "inputs": {
       "shift_video": 3,
-      "shift_audio": 3,
+      "shift_audio": 2.3899999999999997,
       "model": [
-        "149",
+        "165",
         0
       ]
     },
@@ -262,6 +245,23 @@
     "class_type": "MiniMaxH3ProgressiveSampler",
     "_meta": {
       "title": "h3-progressivesampler"
+    }
+  },
+  "165": {
+    "inputs": {
+      "switch": false,
+      "on_false": [
+        "127",
+        0
+      ],
+      "on_true": [
+        "147",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "h3-switch"
     }
   }
 }
