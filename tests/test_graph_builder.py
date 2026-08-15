@@ -400,6 +400,38 @@ def test_a_sampler_this_build_does_not_list_is_still_sent():
     assert built.graph[ROLES.scheduler]["inputs"]["scheduler"] == "beta_57"
 
 
+def test_the_filename_prefix_is_written_only_when_one_is_asked_for():
+    """Empty means the workflow's own output node stands, which is what someone who set
+    it in ComfyUI expects -- and keeps an unmodified workflow out of the tier-0 diff."""
+    shipped = BASE[ROLES.vidcombine]["inputs"]["filename_prefix"]
+
+    left = build_graph(BASE, BuildState(filename_prefix=""), ROLES)
+    assert left.graph[ROLES.vidcombine]["inputs"]["filename_prefix"] == shipped
+
+    asked = build_graph(BASE, BuildState(filename_prefix="renders/today"), ROLES)
+    assert asked.graph[ROLES.vidcombine]["inputs"]["filename_prefix"] == "renders/today"
+
+
+@pytest.mark.parametrize("given, expected", [
+    ("/etc/passwd", "etc/passwd"),                  # anchored back inside output/
+    ("../../secrets/x", "secrets/x"),
+    ("renders\\today\\shot", "renders/today/shot"),  # the server may not be Windows
+    ("  spaced / out  ", "spaced/out"),
+    ("videos//h3", "videos/h3"),
+    ("..", ""),                                     # nothing left to ask for
+    ("%date:yyyy-MM-dd%/shot", "%date:yyyy-MM-dd%/shot"),   # ComfyUI's tokens survive
+])
+def test_a_prefix_can_only_name_something_inside_the_output_folder(given, expected):
+    """ComfyUI rejects an escape itself, but several minutes into a run. Anchoring here
+    means it is never sent rather than costing a generation to discover."""
+    assert config.clean_filename_prefix(given) == expected
+
+
+def test_an_escaping_prefix_never_reaches_the_graph():
+    built = build_graph(BASE, BuildState(filename_prefix="../../loose"), ROLES)
+    assert built.graph[ROLES.vidcombine]["inputs"]["filename_prefix"] == "loose"
+
+
 def test_unspecified_workflow_values_are_left_alone():
     """Sampler, frame rate, codec and filename_prefix are not exposed."""
     built = build_graph(BASE, state_from_workflow(BASE, ROLES), ROLES)

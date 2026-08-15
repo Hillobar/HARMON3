@@ -9,6 +9,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from harmon3 import comfy_http                                  # noqa: E402
 from harmon3.comfy_http import ComfyClient, ComfyError          # noqa: E402
 
 
@@ -70,6 +71,36 @@ def test_partial_execution_targets_and_extra_data_coexist(client):
     body = _body(client)
     assert body["partial_execution_targets"] == ["9"]
     assert body["extra_data"] == {"extra_pnginfo": {}}
+
+
+# ---------------------------------------------------------------------------------
+# Where the server writes. /system_stats reports the server's own argv, which is the
+# only place the HTTP API says anything about a filesystem path at all.
+# ---------------------------------------------------------------------------------
+
+def _stats(*argv):
+    return {"system": {"comfyui_version": "0.33.0", "argv": list(argv)}}
+
+
+@pytest.mark.parametrize("argv", [
+    ("main.py", "--output-directory", r"F:\outputs", "--listen"),
+    ("main.py", r"--output-directory=F:\outputs"),
+    ("main.py", "--listen", "--output-directory", '"F:\\outputs"'),
+])
+def test_the_output_directory_is_read_from_the_servers_own_argv(argv):
+    assert comfy_http.output_dir_from_stats(_stats(*argv)) == r"F:\outputs"
+
+
+@pytest.mark.parametrize("stats", [
+    _stats("main.py", "--listen"),          # no flag: ComfyUI defaults to <install>/output
+    _stats("main.py", "--output-directory"),            # flag with nothing after it
+    _stats("main.py", "--output-directory", "outputs"),  # relative to a cwd nobody reports
+    _stats(), {}, {"system": {}}, {"system": {"argv": None}},
+])
+def test_an_unknowable_output_directory_is_not_guessed_at(stats):
+    """argv[0] is a bare 'main.py', so there is nothing to join a default onto, and a
+    relative path is relative to a working directory the API never mentions."""
+    assert comfy_http.output_dir_from_stats(stats) is None
 
 
 def test_a_rejection_still_carries_its_node_errors(monkeypatch):

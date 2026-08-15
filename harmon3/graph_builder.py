@@ -217,6 +217,9 @@ class BuildState:
     shift_video: float = config.DEFAULT_SHIFT_VIDEO
     #: How reference images are sized before encoding (h3-reference).
     ref_image_size: str = config.DEFAULT_REF_IMAGE_SIZE
+    #: Where the output node files the result inside ComfyUI's output folder. Empty leaves
+    #: the workflow's own value alone.
+    filename_prefix: str = ""
     #: Patch the model with Sage Attention (h3-sage / h3-switch).
     sage_attention: bool = config.DEFAULT_SAGE_ATTENTION
     refs: RefSet = field(default_factory=RefSet)
@@ -360,6 +363,13 @@ def build_graph(base: dict, state: BuildState, roles) -> BuiltGraph:
     scheduler_inputs["steps"] = clamp_steps(state.steps)
     scheduler_inputs["scheduler"] = clean_scheduler(state.scheduler)
     graph[roles.sampler]["inputs"]["sampler_name"] = clean_sampler(state.sampler_name)
+
+    # Only when something was asked for. An empty prefix means the workflow's own value
+    # stands, which is what a user who edited the output node in ComfyUI expects -- and
+    # keeps this out of the tier-0 diff on a workflow nobody has overridden.
+    prefix = config.clean_filename_prefix(state.filename_prefix)
+    if prefix:
+        graph[roles.vidcombine]["inputs"]["filename_prefix"] = prefix
 
     _strip_frontend_inputs(graph)
     _apply_sage(graph, roles, bool(state.sage_attention))

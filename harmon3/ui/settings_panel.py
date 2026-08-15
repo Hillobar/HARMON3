@@ -227,18 +227,43 @@ class SettingsPanel(QWidget):
         form.addRow("Address", self.server_edit)
 
         self.output_row = PathRow(
-            placeholder="optional",
+            placeholder="detected from the server",
             caption="Choose ComfyUI's output folder")
         self.output_row.changed.connect(self._refresh_state)
         form.addRow("Output folder", self.output_row)
 
+        self.output_note = style.hint("")
+        self.output_note.setWordWrap(True)
+        form.addRow("", self.output_note)
+        self.set_detected_output_dir("")
+
+        self.prefix_edit = QLineEdit()
+        self.prefix_edit.setPlaceholderText(config.DEFAULT_FILENAME_PREFIX)
+        self.prefix_edit.setToolTip(
+            "Where the output node files the finished video, inside ComfyUI's own output\n"
+            "folder. A subfolder and a name stem, so 'videos/h3' writes\n"
+            "output/videos/h3_00001.mp4. ComfyUI's date tokens work here:\n"
+            "%date:yyyy-MM-dd%/shot writes a folder per day.")
+        self.prefix_edit.textChanged.connect(self._refresh_state)
+        form.addRow("Filename prefix", self.prefix_edit)
+
         note = style.hint(
-            "Optional. When this machine can read ComfyUI's output folder directly, "
-            "finished videos are copied from it instead of downloaded.")
+            "ComfyUI adds the counter and the extension. Leave blank to keep whatever the "
+            "workflow's own output node was saved with.")
         note.setWordWrap(True)
         form.addRow("", note)
 
         return group
+
+    def set_detected_output_dir(self, path: str) -> None:
+        """Say what was found, so the empty field reads as working rather than unset."""
+        self.output_note.setText(
+            f"Results are read from {path}, where ComfyUI wrote them - nothing is copied "
+            "or downloaded. Fill the field in to override it."
+            if path else
+            "Optional. The server is asked where it writes; set this only when that "
+            "answer is wrong here, as it is for a container or a network share. Without "
+            "either, finished videos are downloaded into runs/videos.")
 
     def _build_acceleration(self) -> QGroupBox:
         group = QGroupBox("Acceleration")
@@ -442,6 +467,7 @@ class SettingsPanel(QWidget):
         self.scenes_row.setText(settings.get("scenes_dir", ""))
         self.server_edit.setText(settings.get("server_url", ""))
         self.output_row.setText(settings.get("server_output_dir", ""))
+        self.prefix_edit.setText(settings.get("filename_prefix", ""))
 
         # blockSignals: these take effect immediately rather than on Apply, so setting
         # them from stored settings must not read as the user toggling them.
@@ -478,6 +504,7 @@ class SettingsPanel(QWidget):
             "scenes_dir": self.scenes_row.text(),
             "server_url": self.server_edit.text().strip(),
             "server_output_dir": self.output_row.text(),
+            "filename_prefix": config.clean_filename_prefix(self.prefix_edit.text()),
         }
 
     def is_dirty(self) -> bool:

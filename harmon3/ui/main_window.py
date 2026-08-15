@@ -101,6 +101,9 @@ class MainWindow(QMainWindow):
         #: Set when a scene is loaded with the intent of queueing it straight away.
         self._run_scene_when_ready = False
         self.reachable = False
+        #: Where the connected server said it writes results, if this machine can read it.
+        #: Not persisted: it describes a server, not a preference.
+        self.detected_output_dir = ""
         #: Everything submitted and not yet finished, oldest first. ComfyUI's queue is a
         #: FIFO, so the head is the run it is working on -- see harmon3/runqueue.py.
         self.runs = runqueue.RunQueue()
@@ -421,6 +424,7 @@ class MainWindow(QMainWindow):
         self.job_runner.moveToThread(self.job_thread)
 
         self.job_runner.reachability_changed.connect(self._on_reachability)
+        self.job_runner.output_dir_found.connect(self._on_output_dir_found)
         self.job_runner.object_info_ready.connect(self._on_object_info)
         self.job_runner.model_problems.connect(self._on_model_problems)
         self.job_runner.upload_started.connect(self._on_upload_started)
@@ -746,6 +750,29 @@ class MainWindow(QMainWindow):
             self._probe_all_media()
         self._refresh_derived()
 
+    def _on_output_dir_found(self, path: str) -> None:
+        """Remember where the server writes, so results need not be copied anywhere.
+
+        Not written into settings: it describes the server that happens to be connected,
+        and persisting it would leave a stale path behind after switching to another one.
+        The Settings field stays authoritative when it is filled in.
+        """
+        if path == self.detected_output_dir:
+            return
+        self.detected_output_dir = path
+        self.settings_panel.set_detected_output_dir(path)
+        if path:
+            self._log(f"ComfyUI writes its results to {path}")
+
+    def _output_dir(self) -> str:
+        """What was configured, or failing that what the server said. Empty means /view.
+
+        The setting wins because it is the override for the case detection cannot cover:
+        the server reporting a path that means something different on this machine, as a
+        container or a network share will.
+        """
+        return self.settings.get("server_output_dir", "") or self.detected_output_dir
+
     def _on_object_info(self, object_info: dict) -> None:
         """The server's node schemas arrived; offer the samplers it actually has.
 
@@ -1028,7 +1055,7 @@ class MainWindow(QMainWindow):
         request = JobRequest.snapshot(
             state,
             self.settings.setdefault("upload_cache", {}),
-            self.settings.get("server_output_dir", ""),
+            self._output_dir(),
         )
         # On the copy, never the live rows: a posed row submits its skeleton and starts at
         # zero, while the row on screen keeps naming the user's own file at its own mark.
@@ -1457,7 +1484,7 @@ class MainWindow(QMainWindow):
             return
         self.fetch_requested_for = prompt_id
         self.stage_label.setText("downloading")
-        self._fetch_requested.emit(prompt_id, refs[0], self.settings.get("server_output_dir", ""))
+        self._fetch_requested.emit(prompt_id, refs[0], self._output_dir())
 
     def _on_execution_success(self, prompt_id: str) -> None:
         if not self._is_ours(prompt_id):
@@ -1475,7 +1502,7 @@ class MainWindow(QMainWindow):
             # The `executed` payload can be missed if the socket blipped; /history has it.
             self.fetch_requested_for = prompt_id
             self._fetch_from_history_requested.emit(
-                prompt_id, self.settings.get("server_output_dir", ""))
+                prompt_id, self._output_dir())
 
     def _on_execution_error(self, prompt_id: str, data: dict) -> None:
         run = self.runs.find(prompt_id) if prompt_id else None
@@ -1805,7 +1832,7 @@ class MainWindow(QMainWindow):
         try:
             request = JobRequest.snapshot(
                 state, dict(self.settings.get("upload_cache", {})),
-                self.settings.get("server_output_dir", ""))
+                self._output_dir())
             pose_mod.swap_in(request.state, poses)
             scaling_mod.swap_in(request.state, self._rescaled_images())
             result = bundle_mod.export(state, request.state, notes=notes)
@@ -1856,6 +1883,14 @@ class MainWindow(QMainWindow):
             messages.append(f"Reconnecting to {server}.")
 
         self.settings["server_output_dir"] = staged.get("server_output_dir", "")
+
+        prefix = config.clean_filename_prefix(staged.get("filename_prefix", ""))
+        if prefix != self.settings.get("filename_prefix", ""):
+            self.settings["filename_prefix"] = prefix
+            self.state.filename_prefix = prefix
+            messages.append(
+                f"Results will be filed under {prefix}." if prefix
+                else "Results go wherever the workflow's own output node says.")
 
         self._save_settings()
         self.settings_panel.load(self.settings)

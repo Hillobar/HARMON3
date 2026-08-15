@@ -12,6 +12,8 @@ import sys
 import threading
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from harmon3 import prompt, settings as settings_mod           # noqa: E402
@@ -132,6 +134,53 @@ def test_save_settings_never_raises(tmp_path, monkeypatch):
     monkeypatch.setattr(settings_mod.json, "dump", explode)
     settings_mod.save_settings(dict(settings_mod.DEFAULTS), tmp_path / "settings.json")
     assert not list(tmp_path.glob(".settings-*.tmp"))
+
+
+def test_the_filename_prefix_survives_a_settings_round_trip(tmp_path):
+    state = _state()
+    state.filename_prefix = "renders/today"
+    data = settings_mod.capture_from_state(dict(settings_mod.DEFAULTS), state)
+
+    target = tmp_path / "settings.json"
+    settings_mod.save_settings(data, target)
+    restored = _state()
+    settings_mod.apply_to_state(restored, settings_mod.load_settings(target))
+    assert restored.filename_prefix == "renders/today"
+
+
+def test_a_hand_edited_prefix_is_sanitised_on_the_way_in():
+    """settings.json is editable by hand, so the anchoring cannot live only in the UI."""
+    state = _state()
+    settings_mod.apply_to_state(state, {"filename_prefix": "../../loose"})
+    assert state.filename_prefix == "loose"
+
+
+def test_a_result_already_readable_here_is_not_copied_anywhere(tmp_path, monkeypatch):
+    """The whole point of knowing ComfyUI's output folder: the file is already on this
+    disk, and a second copy in runs/videos costs the size of every generation for
+    nothing. Downloading stays the fallback for a server whose path means nothing here."""
+    from harmon3 import config, jobs
+    from harmon3.comfy_http import OutputRef
+
+    output = tmp_path / "comfy-output" / "videos"
+    output.mkdir(parents=True)
+    produced = output / "h3_00007.mp4"
+    produced.write_bytes(b"a finished video")
+
+    cache = tmp_path / "runs" / "videos"
+    monkeypatch.setattr(config, "VIDEO_CACHE_DIR", cache)
+
+    runner = jobs.JobRunner.__new__(jobs.JobRunner)      # no Qt event loop needed
+    emitted = []
+    runner.downloaded = type("S", (), {"emit": lambda _s, *a: emitted.append(a)})()
+    runner.client = type("C", (), {
+        "download": lambda *a, **k: pytest.fail("should not have downloaded")})()
+
+    ref = OutputRef(filename="h3_00007.mp4", subfolder="videos", type="output")
+    jobs.JobRunner.fetch_result(runner, "pid-1", ref, str(tmp_path / "comfy-output"))
+
+    assert emitted == [("pid-1", str(produced))]
+    assert not cache.exists(), "runs/videos should not even have been created"
 
 
 def test_settings_round_trip_keeps_reference_structure(tmp_path):

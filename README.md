@@ -228,9 +228,22 @@ run the server has already begun is interrupted, one still waiting is deleted fr
 queue without touching whatever is executing.
 
 The clip being sampled animates in the result frame step by step, via KJNodes' preview
-node. The progress bar reads `sampling 13/20 48s left`. Finished videos are downloaded to
-`runs/videos/`, played in the app with audio, and recorded in `runs/runs.jsonl` — each
-history entry stores the exact graph submitted, so *Re-queue* resubmits it verbatim.
+node. The progress bar reads `sampling 13/20 48s left`. Every run is recorded in
+`runs/runs.jsonl` with the exact graph submitted, so *Re-queue* resubmits it verbatim.
+
+**The finished video stays where ComfyUI put it.** The workflow's output node writes into
+ComfyUI's own output folder, and the app plays it from there — it does not keep a second
+copy. On startup it asks the server where that is (`/system_stats` reports the command
+line ComfyUI was started with, which is the only place the API mentions a path at all) and
+uses the answer when this machine can read it. Set *Output folder* in Settings when it
+can't — a container or a network share will report a path that means something else here.
+Failing both, the video is downloaded through `/view` into `runs/videos/`, which is what
+happens against any remote server.
+
+*Filename prefix* in Settings decides where inside that folder it lands: a subfolder and a
+name stem, so `videos/h3` gives `output/videos/h3_00001.mp4`, and ComfyUI's date tokens
+work — `%date:yyyy-MM-dd%/shot` files a folder per day. Leave it blank to keep whatever
+the workflow's own output node was saved with. ComfyUI adds the counter and the extension.
 
 **Diagnostics → Export references** writes out exactly what the model is about to be given,
 into `reference_bundle/`: the files as they will be uploaded — after any section cut,
@@ -273,11 +286,13 @@ how a branch of your own — a second output, a preview — survives a build.
 **Free to change:** node numbering and layout; untagged nodes anywhere in the model chain
 (a LoRA loader, a model patch); side branches, as long as something in each is tagged
 `h3-keep`; and any widget the app does not write — model filenames, the output node's
-prefix, format and codec.
+format and codec, and its `filename_prefix` unless the Settings field overrides it.
 
 **Changes only until the first launch:** the exposed parameters, the prompt and the Sage
 switch. These are read from the workflow to seed `settings.json`, which owns them
-afterwards.
+afterwards. `filename_prefix` is the exception among the values the app can write: it is
+never seeded, so the output node's own prefix keeps working until you put something in the
+Settings field, and clearing that field hands it back.
 
 **Not free:** removing a required role, putting one tag on two nodes, or changing a role
 node's class to one outside its accepted set — all three are refused at startup with the

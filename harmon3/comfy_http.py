@@ -109,6 +109,43 @@ def websocket_url(base_url: str, client_id: str) -> str:
     return urlunparse((scheme, parsed.netloc, path, "", f"clientId={client_id}", ""))
 
 
+#: The flag ComfyUI takes for where it writes results, in both spellings argparse accepts.
+_OUTPUT_FLAG = "--output-directory"
+
+
+def output_dir_from_stats(stats: dict) -> str | None:
+    """Where the server writes its results, read from the argv it reports, or None.
+
+    ``/system_stats`` carries the server's own command line, and that is the *only* place
+    the API says anything about a filesystem path: ``/view`` addresses an output by
+    ``(filename, subfolder, type)`` and deliberately never reveals where that is on disk.
+
+    Returns None rather than guessing whenever the answer is not actually knowable:
+
+    * without the flag, ComfyUI defaults to ``<install>/output`` -- and ``argv[0]`` is a
+      bare ``main.py``, so there is nothing to join that to;
+    * a relative path is relative to the server's working directory, which is not
+      reported either.
+
+    The path is the *server's*, so a caller still has to check it exists from here before
+    trusting it -- against a remote ComfyUI it will be a perfectly well-formed path to
+    somewhere on another machine.
+    """
+    argv = ((stats or {}).get("system") or {}).get("argv") or []
+    for index, item in enumerate(argv):
+        if not isinstance(item, str):
+            continue
+        if item.startswith(f"{_OUTPUT_FLAG}="):
+            value = item.split("=", 1)[1]
+        elif item == _OUTPUT_FLAG and index + 1 < len(argv):
+            value = argv[index + 1]
+        else:
+            continue
+        value = str(value).strip().strip('"')
+        return value if value and Path(value).is_absolute() else None
+    return None
+
+
 class ComfyClient:
     """Thin, thread-confined wrapper over the ComfyUI HTTP endpoints this app uses."""
 
@@ -149,6 +186,13 @@ class ComfyClient:
 
     def system_stats(self) -> dict:
         return self._get_json("/system_stats", timeout=5)
+
+    def output_dir(self) -> str | None:
+        """Where the connected server writes its results, if it can be worked out."""
+        try:
+            return output_dir_from_stats(self.system_stats())
+        except (ComfyUnreachable, ComfyError):
+            return None
 
     def is_reachable(self) -> bool:
         try:

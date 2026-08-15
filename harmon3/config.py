@@ -333,7 +333,28 @@ DEFAULT_SEED = 157368968253448
 #: the model, and the workflow ships it switched on.
 DEFAULT_SAGE_ATTENTION = True
 
+#: Where the output node files a finished video inside ComfyUI's own output folder. Only a
+#: fallback: the real default is read from whatever the workflow's output node was saved
+#: with, which is what a user editing the workflow would expect to keep.
+DEFAULT_FILENAME_PREFIX = "videos/h3"
+
 MAX_SEED = 0xFFFFFFFFFFFFFF  # 2**56-1, matches ComfyUI's noise_seed range
+
+
+def clean_filename_prefix(prefix: str) -> str:
+    """A prefix that can only ever name something inside ComfyUI's output folder.
+
+    ComfyUI resolves this against its own output directory and rejects an escape itself,
+    but it does so several minutes into a run. Anchoring it here means a leading slash or
+    a ``..`` is simply not sent, rather than costing a generation to find out. Backslashes
+    are folded to forward slashes because this is a server-side path and the server may
+    well not be Windows.
+
+    An empty result is the signal to leave the workflow's own value alone.
+    """
+    parts = [p.strip() for p in str(prefix or "").replace("\\", "/").split("/")]
+    kept = [p for p in parts if p not in ("", ".", "..")]
+    return "/".join(kept)
 
 
 @dataclass(frozen=True)

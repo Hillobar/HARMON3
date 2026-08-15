@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import copy
 import logging
-import shutil
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -66,6 +65,9 @@ class JobRunner(QObject):
     """
 
     reachability_changed = Signal(bool, str)          # reachable, detail
+    #: Where the connected server writes results, when that is knowable and readable from
+    #: here. Empty when it is not, which is the normal case for a remote ComfyUI.
+    output_dir_found = Signal(str)
     # `object`, not dict/list: node schemas contain uint64 bounds that Qt's QVariantMap
     # conversion cannot represent, and it raises OverflowError rather than delivering.
     object_info_ready = Signal(object)                # class -> schema
@@ -113,6 +115,13 @@ class JobRunner(QObject):
         if devices:
             detail += f" - {devices[0].get('name', '?').split(':')[0]}"
         self.reachability_changed.emit(True, detail)
+
+        # Checked for existence here rather than by the UI: this is the thread that is
+        # allowed to touch the filesystem, and a path the server reports is only useful
+        # if this machine can actually read it.
+        detected = comfy_http.output_dir_from_stats(stats)
+        self.output_dir_found.emit(
+            detected if detected and Path(detected).is_dir() else "")
 
         if not self._object_info:
             self.refresh_object_info()
@@ -258,22 +267,25 @@ class JobRunner(QObject):
 
     @Slot(str, object, str)
     def fetch_result(self, prompt_id: str, ref: OutputRef, server_output_dir: str) -> None:
-        destination = config.VIDEO_CACHE_DIR / f"{prompt_id}{Path(ref.filename).suffix or '.mp4'}"
-        destination.parent.mkdir(parents=True, exist_ok=True)
+        """Make the finished video available locally, preferring not to move it at all.
 
-        # When ComfyUI runs on this machine its output directory is directly readable, so
-        # a copy beats a round trip through /view. /view stays the default so the app
-        # still works against a remote server.
+        When ComfyUI's output directory is readable from here the file is used exactly
+        where the workflow's output node wrote it. Copying it into ``runs/videos`` would
+        double the disk cost of every run for nothing: this app only ever reads a result,
+        and ComfyUI's own output folder is the place a user already looks for one.
+
+        The download stays the fallback, because a remote server's output path is a path
+        on another machine. Nothing else changes for that case.
+        """
         if server_output_dir:
             local = Path(server_output_dir) / ref.subfolder / ref.filename
             if local.is_file():
-                try:
-                    shutil.copy2(local, destination)
-                    self.downloaded.emit(prompt_id, str(destination))
-                    return
-                except OSError as exc:
-                    log.info("Local copy of %s failed (%s); falling back to /view", local, exc)
+                self.downloaded.emit(prompt_id, str(local))
+                return
+            log.info("%s is not readable from here; falling back to /view", local)
 
+        destination = config.VIDEO_CACHE_DIR / f"{prompt_id}{Path(ref.filename).suffix or '.mp4'}"
+        destination.parent.mkdir(parents=True, exist_ok=True)
         try:
             self.client.download(ref, destination, progress=self.download_progress.emit)
         except (ComfyUnreachable, ComfyError) as exc:

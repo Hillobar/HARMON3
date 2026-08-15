@@ -24,9 +24,14 @@ SCHEMA_VERSION = 1
 DEFAULTS: dict = {
     "schema_version": SCHEMA_VERSION,
     "server_url": config.DEFAULT_SERVER_URL,
-    #: Optional: ComfyUI's output directory as this machine sees it. When set and the
-    #: produced file is found there, the /view download is skipped.
+    #: Optional override for ComfyUI's output directory as *this* machine sees it. Left
+    #: empty the app asks the server, which reports its own argv; this is for when that
+    #: answer does not apply here, as with a container or a network share. Either way, a
+    #: result found there is used where it lies instead of downloaded.
     "server_output_dir": "",
+    #: Where the output node files the finished video inside that directory. Empty means
+    #: whatever the workflow's own output node carries.
+    "filename_prefix": "",
     #: Where scenes are saved. Empty means the default folder beside the app.
     "scenes_dir": "",
     "aspect_ratio": config.DEFAULT_ASPECT_RATIO,
@@ -163,6 +168,10 @@ def apply_to_state(state, data: dict) -> None:
     state.shift_video = float(data.get("shift_video", state.shift_video))
     state.ref_image_size = str(data.get("ref_image_size", state.ref_image_size))
     state.sage_attention = bool(data.get("sage_attention", state.sage_attention))
+    # Sanitised on the way in as well as on the way out: settings.json is hand-editable,
+    # and an escaping prefix should never reach a build whatever wrote it.
+    state.filename_prefix = config.clean_filename_prefix(
+        data.get("filename_prefix", state.filename_prefix))
 
     if data.get("prompt_sections") is not None:
         state.prompt_sections = prompt_mod.normalise(data["prompt_sections"])
@@ -186,6 +195,7 @@ def capture_from_state(data: dict, state) -> dict:
         "shift_video": state.shift_video,
         "ref_image_size": state.ref_image_size,
         "sage_attention": state.sage_attention,
+        "filename_prefix": state.filename_prefix,
         "prompt_sections": dict(state.prompt_sections),
         "refs": state.refs.to_list(),
     })
