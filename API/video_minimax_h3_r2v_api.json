@@ -222,7 +222,7 @@
   "164": {
     "inputs": {
       "noise_seed": 0,
-      "schedule": "0.5:0.55, 1.0:1.0",
+      "schedule": "1.0:1.0",
       "upscale_method": "bicubic",
       "verbose": true,
       "guider": [

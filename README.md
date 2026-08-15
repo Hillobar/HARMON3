@@ -197,8 +197,8 @@ the frame count the model will really receive and what that is in seconds.
 | *Length* | the model only accepts frame counts of the form 17k+5 at 24 fps, so the request is rounded **up**. Ceiling 3592 frames — 149.6 s |
 | *Steps* | sampling steps. Run time is very nearly proportional to it |
 | *Sampler*, *Scheduler* | the list starts as stock ComfyUI's and becomes whatever the connected server offers, so sampler packs show up on their own |
-| *Schedule* | the staged sampler's progressive-resolution plan, as `scale:end_percent` per stage — `0.5:0.55, 1.0:1.0` spends the first 55% of the steps at half grid. The last stage must be `1.0:1.0`. Checked as you type. Shown only when the workflow's sampler declares one |
-| *Stage upscale* | how the estimate is resampled between staging stages. Does nothing at `1.0:1.0`. Shown and hidden with *Schedule* |
+| *Schedule* | the staged sampler's progressive-resolution plan, as `scale:end_percent` per stage. **Defaults to `1.0:1.0`** — one full-resolution stage, i.e. no staging, which is what the sampler would do anyway. Add stages to trade quality for speed: `0.5:0.55, 1.0:1.0` spends the first 55% of the steps at half grid. The last stage must be `1.0:1.0`. Checked as you type. Shown only when the workflow's sampler declares one |
+| *Stage upscale* | how the estimate is resampled between staging stages. Does nothing at the default `1.0:1.0`, where nothing is ever upscaled. Shown and hidden with *Schedule* |
 | *Sigma shift* | where the weight of the sigma schedule sits. Higher moves the picture further from the references; lower holds closer. Needs an `h3-shift` node |
 | *Reference size* | `ref_image_size`, applied to every reference at once. **match** scales each to the generation's pixel area; **max** uses the 2048px short edge for best fidelity but can be several times slower. Defaults to **max**, since each reference now carries its own ceiling. **Does not apply to reference videos** — those are fitted to a fixed canvas regardless |
 | *Seed* | 56-bit, with a dice button and a *New seed for every run* toggle |

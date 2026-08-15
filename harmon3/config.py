@@ -154,7 +154,12 @@ DEFAULT_SCHEDULER = "simple"
 #:
 #: Only reaches the graph when the workflow has a sampler that declares it; see
 #: graph_builder.schedule_node.
-DEFAULT_SCHEDULE = "0.5:0.55, 1.0:1.0"
+#:
+#: One full-resolution stage by default, which is what the sampler would do without any
+#: staging at all. Staging is a speed/quality trade the user should reach for knowingly:
+#: a default that already runs the first half of every generation at half grid changes
+#: what comes out, and someone who never opens this field would have no way of knowing.
+DEFAULT_SCHEDULE = "1.0:1.0"
 #: The A/B baseline: one stage, at full resolution, i.e. what SamplerCustomAdvanced does.
 BASELINE_SCHEDULE = "1.0:1.0"
 
