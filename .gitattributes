@@ -1,0 +1,8 @@
+# Normalise to LF in the repository and check out native, so a clone on another platform
+# does not show every file as modified. The .bat files are the exception: cmd.exe wants
+# CRLF and a batch file with bare LFs can fail in ways that are hard to read.
+* text=auto
+*.bat text eol=crlf
+*.py text
+*.json text
+*.md text

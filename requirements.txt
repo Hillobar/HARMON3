@@ -1,0 +1,59 @@
+# HARMON3 runtime dependencies.
+#
+# Full PySide6, not PySide6-Essentials: as of 6.11.1 the Essentials wheel no longer ships
+# QtMultimedia / QtMultimediaWidgets (they live in PySide6-Addons), and the in-app video
+# player needs both. `PySide6` is the metapackage pulling Essentials + Addons.
+# setup.bat asserts the QtMultimedia import so a future wheel reshuffle fails loudly.
+PySide6==6.11.1
+
+# Multipart upload to POST /upload/image and streaming download from GET /view.
+requests>=2.32,<3
+
+# Blocking WebSocket client for ComfyUI's /ws progress stream. This is the same library
+# ComfyUI's own script_examples/websockets_api_example.py uses.
+websocket-client>=1.8,<2
+
+# Decodes the live sampler preview, which the Model Preview Override node sends as a
+# fragmented H.264 MP4 per step (NVENC), and gives exact local probing of reference
+# videos using the same decoder ComfyUI's GetVideoComponents uses. Also *encodes* the
+# pose clips, so pose estimation adds no second media stack and no ffmpeg subprocess.
+av>=13
+
+# --- pose estimation -------------------------------------------------------------------
+# The Pose toggle renders a reference down to a skeleton locally, before the run is
+# queued. rtmlib is RTMPose/DWPose/RTMW/ViTPose over bare ONNX Runtime -- no mmcv, no
+# mmpose, no torch, which is the whole reason it is this library and not MMPose.
+#
+# It pulls in numpy and opencv. Until now this app deliberately had neither (see the
+# comment in tests/test_preview.py and preview._image_from_frame, which builds a QImage
+# from a plane buffer rather than an ndarray). A real estimator ends that; the rest of
+# the app still takes the no-numpy path.
+rtmlib>=0.0.16
+
+# 1.27 is the first PyPI build against CUDA 13 -- and the release that drops CUDA 12, so
+# ">=1.27" is exactly the CUDA 13 line rather than a range spanning both. The CUDA and
+# cuDNN runtimes come from the -cu13 wheels below rather than a system toolkit: this venv
+# has no torch to supply those DLLs, and onnxruntime.preload_dlls() finds them in
+# site-packages. Falls back to the CPU provider (loudly) if any of it is missing.
+# Note the asymmetric names, which are NVIDIA's rather than a typo: for CUDA 13 cuBLAS
+# and the runtime dropped the suffix and are versioned 13.x, while cuDNN kept it and is
+# versioned 9.x. "nvidia-cublas-cu13" also exists on PyPI, as a 0.0.1 stub that fails to
+# build -- installing that one is the wrong turn this comment exists to prevent.
+#
+# cudart, cuFFT and cuRAND are not optional extras: without them the CUDA provider loads
+# and then fails on its first session with a missing-DLL message.
+onnxruntime-gpu>=1.27
+nvidia-cudnn-cu13>=9.24
+nvidia-cublas>=13
+nvidia-cuda-runtime>=13
+nvidia-cufft>=12
+nvidia-curand>=10.4
+
+# IMPORTANT: rtmlib depends on plain `onnxruntime`, and the two packages install over the
+# top of each other -- whichever lands last wins, and if that is the CPU build then
+# get_available_providers() never mentions CUDA even though the provider DLL is sitting
+# right there. setup.bat resolves it by removing the CPU build and reinstalling this one
+# afterwards, because pip has no way to say "this dependency, but the GPU flavour".
+
+# --- development ---------------------------------------------------------------------
+# pytest>=8

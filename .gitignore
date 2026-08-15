@@ -1,0 +1,36 @@
+# Everything the app writes for itself. All of it lives under HARMON3_HOME, which
+# defaults to the checkout (harmon3/config.py), so a fresh clone regenerates the lot on
+# first run and none of it is worth a diff.
+#
+# settings.json and scenes/ are the ones that matter: they carry prompt text, the upload
+# cache and absolute paths to whatever source material was last loaded. They belong to
+# whoever ran the app, not to the project.
+#
+# Anchored with a leading slash, all of them: a bare "settings.json" matches at every
+# level and would have quietly swallowed .claude/settings.json too.
+/settings.json
+/ui_state.ini
+/scenes/
+/runs/
+/reference_bundle/
+
+# Model weights. ViTPose-L is 1.2GB and YOLOX another 351MB, and setup.bat fetches both.
+/models/
+
+# Environment
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Personal Claude Code settings; .claude/settings.json is the shared one and is tracked.
+.claude/settings.local.json
+
+# Editors and OS droppings
+.vscode/
+.idea/
+*.swp
+*~
+Thumbs.db
+desktop.ini
+.DS_Store

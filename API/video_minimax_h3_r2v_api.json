@@ -1,0 +1,267 @@
+{
+  "119": {
+    "inputs": {
+      "vae_name": "minimax_h3\\minimax_h3_video_vae_fp16.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "h3-loadvideovae"
+    }
+  },
+  "120": {
+    "inputs": {
+      "vae_name": "minimax_h3\\minimax_h3_audio_vae_fp32.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "h3-loadaudiovae"
+    }
+  },
+  "121": {
+    "inputs": {
+      "samples": [
+        "164",
+        0
+      ],
+      "vae": [
+        "120",
+        0
+      ]
+    },
+    "class_type": "VAEDecodeAudio",
+    "_meta": {
+      "title": "h3-audiodecode"
+    }
+  },
+  "122": {
+    "inputs": {
+      "samples": [
+        "164",
+        0
+      ],
+      "vae": [
+        "119",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "h3-imagedecode"
+    }
+  },
+  "123": {
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "h3-sampler"
+    }
+  },
+  "124": {
+    "inputs": {
+      "scheduler": "beta",
+      "steps": 40,
+      "denoise": 1,
+      "model": [
+        "141",
+        0
+      ]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": {
+      "title": "h3-scheduler"
+    }
+  },
+  "126": {
+    "inputs": {
+      "model": [
+        "141",
+        0
+      ],
+      "conditioning": [
+        "163",
+        0
+      ]
+    },
+    "class_type": "BasicGuider",
+    "_meta": {
+      "title": "h3-guider"
+    }
+  },
+  "127": {
+    "inputs": {
+      "unet_name": "minimax_h3\\minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "h3-loadmodel"
+    }
+  },
+  "128": {
+    "inputs": {
+      "clip_name": "qwen\\qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "type": "minimax",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "h3-loadclip"
+    }
+  },
+  "141": {
+    "inputs": {
+      "max_resolution": 1024,
+      "jpeg_quality": 80,
+      "suppress_default_preview": true,
+      "preview_frames": 24,
+      "preview_fps": 6,
+      "tiny_vae": "taeh3_KJ.safetensors",
+      "model": [
+        "155",
+        0
+      ]
+    },
+    "class_type": "ModelPreviewOverrideKJ",
+    "_meta": {
+      "title": "h3-preview"
+    }
+  },
+  "147": {
+    "inputs": {
+      "sage_attention": "auto",
+      "allow_compile": true,
+      "model": [
+        "127",
+        0
+      ]
+    },
+    "class_type": "PathchSageAttentionKJ",
+    "_meta": {
+      "title": "h3-sage"
+    }
+  },
+  "149": {
+    "inputs": {
+      "switch": true,
+      "on_true": [
+        "147",
+        0
+      ],
+      "on_false": [
+        "127",
+        0
+      ]
+    },
+    "class_type": "Switch",
+    "_meta": {
+      "title": "h3-switch"
+    }
+  },
+  "154": {
+    "inputs": {
+      "frame_rate": 24,
+      "loop_count": 0,
+      "filename_prefix": "videos/h3",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 15,
+      "save_metadata": true,
+      "trim_to_audio": false,
+      "pingpong": false,
+      "save_output": true,
+      "images": [
+        "122",
+        0
+      ],
+      "audio": [
+        "121",
+        0
+      ]
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": {
+      "title": "h3-vidcombine"
+    }
+  },
+  "155": {
+    "inputs": {
+      "shift_video": 3,
+      "shift_audio": 3,
+      "model": [
+        "149",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3SigmaShift",
+    "_meta": {
+      "title": "h3-shift"
+    }
+  },
+  "159": {
+    "inputs": {
+      "value": "the woman in <pictue 1> dances"
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "h3-promptinput"
+    }
+  },
+  "163": {
+    "inputs": {
+      "prompt": [
+        "159",
+        0
+      ],
+      "width": 1344,
+      "height": 768,
+      "length": 124,
+      "ref_image_size": "match",
+      "clip": [
+        "128",
+        0
+      ],
+      "vae": [
+        "119",
+        0
+      ],
+      "audio_vae": [
+        "120",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3ReferenceToVideo",
+    "_meta": {
+      "title": "h3-reference"
+    }
+  },
+  "164": {
+    "inputs": {
+      "noise_seed": 0,
+      "schedule": "0.5:0.55, 1.0:1.0",
+      "upscale_method": "bicubic",
+      "verbose": true,
+      "guider": [
+        "126",
+        0
+      ],
+      "sampler": [
+        "123",
+        0
+      ],
+      "sigmas": [
+        "124",
+        0
+      ],
+      "latent_image": [
+        "163",
+        1
+      ]
+    },
+    "class_type": "MiniMaxH3ProgressiveSampler",
+    "_meta": {
+      "title": "h3-progressivesampler"
+    }
+  }
+}
