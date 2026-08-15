@@ -27,8 +27,12 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 
-# Personal Claude Code settings; .claude/settings.json is the shared one and is tracked.
-.claude/settings.local.json
+# Claude Code's config. settings.json here is the *project-scoped* file rather than a
+# personal one, so committing it applies its rules to anyone who clones and opens Claude
+# Code in this directory -- and the rule it carries pre-approves running arbitrary Python
+# through the venv. That is a convenience only the author benefits from, so it stays out.
+# Un-ignore a specific path if something in here ever becomes useful to a contributor.
+/.claude/
 
 # Editors and OS droppings
 .vscode/
