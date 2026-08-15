@@ -17,6 +17,10 @@
 # Model weights. ViTPose-L is 1.2GB and YOLOX another 351MB, and setup.bat fetches both.
 /models/
 
+# Engineering notes: what was learned building this, the bugs and their lessons, and the
+# ComfyUI internals read from source. Local only, by choice. README.md is the public one.
+/DEVNOTES.md
+
 # Environment
 .venv/
 __pycache__/

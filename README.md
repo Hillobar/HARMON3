@@ -15,7 +15,7 @@ title — `h3-promptinput`, `h3-loadmodel`, `h3-vidcombine`. Node numbering belo
 ComfyUI, so the workflow can be renumbered, rewired and extended without touching any
 code. See [Modifying the workflow](#modifying-the-workflow).
 
-Sampling goes through `MiniMaxH3ProgressiveSampler` from the `ComfyUI-HillobarNodes` pack,
+Sampling goes through `MiniMaxH3ProgressiveSampler` from the `ComfyUI-Hillobar` pack,
 which must be installed on the server. It runs the early steps on a smaller latent grid and
 upscales the estimate between stages, so most of a run is cheap and only the last stage
 pays full resolution — that is what the **Schedule** parameter drives. The node carries its
@@ -28,8 +28,37 @@ Width, height and length are computed here rather than in the graph and written 
 frame count rounded **up** to the next 17k+5 the model accepts. The workflow carries no
 node that does this arithmetic, so the app is the only thing keeping those values legal.
 
-Engineering notes — what was learned about the ComfyUI node contracts, the bugs found, and
-the design decisions behind all this — are in [NOTES.md](NOTES.md).
+## Requirements
+
+**On this machine:** Windows, Python 3.12 (`py -3.12`), and a reachable ComfyUI. Optional
+pose estimation additionally wants an NVIDIA GPU for `onnxruntime-gpu`; it falls back to
+CPU and says so.
+
+**On the ComfyUI server**, for the shipped workflow. `python -m harmon3 --check` reports
+anything missing before a run rather than during one.
+
+| Custom node pack | Provides |
+|---|---|
+| [ComfyUI-Hillobar](https://github.com/Hillobar) | `MiniMaxH3ProgressiveSampler` |
+| [ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite) | `VHS_LoadVideo`, `VHS_VideoCombine` |
+| [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes) | `ModelPreviewOverrideKJ`, `PathchSageAttentionKJ` |
+| ComfyUI-ConditioningKrea2Rebalance | `Switch` — easy to miss; it is the only thing this pack is needed for |
+
+`MiniMaxH3ReferenceToVideo` and `MiniMaxH3SigmaShift` are **core ComfyUI**
+(`comfy_extras/nodes_minimax_h3.py`), as is everything else in the graph.
+
+Model files, under ComfyUI's usual folders — the workflow names these, and any of them can
+be repointed in ComfyUI without touching this app:
+
+```
+unet/minimax_h3/minimax_h3_ref2va_pruned_int8_convrot.safetensors
+clip/qwen/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors
+vae/minimax_h3/minimax_h3_video_vae_fp16.safetensors      (video)
+vae/minimax_h3/minimax_h3_audio_vae_fp32.safetensors      (audio)
+```
+
+Sage Attention is optional and off unless you switch it on; it needs the `sageattention`
+library where ComfyUI runs.
 
 ## Setup
 
@@ -39,8 +68,10 @@ run.bat          launches the app
 run_debug.bat    launches with a console and verbose logging
 ```
 
-Requires Python 3.12 (`py -3.12`) and a reachable ComfyUI. The default address is
-`http://127.0.0.1:8188`; change it with the **Server...** button.
+The default server address is `http://127.0.0.1:8188`; change it with the **Server...**
+button. Nothing is downloaded at install time except the Python dependencies — ComfyUI
+supplies every generation model, and the pose weights are fetched on first use only if you
+use that feature.
 
 ## Using it
 
@@ -183,12 +214,23 @@ effect on the next run.
 
 **Pose settings** live there too: which weights the *Pose* toggle uses (ViTPose-L,
 ViTPose-B, or the wholebody variant that adds face, hands and feet), how the keypoints are
-joined up, and a *Clear pose clips* button with a running count of what is cached. The
-style choice applies to whichever model is selected — *OpenPose (standard)* hangs both
-hips off the neck, which is the convention pose-conditioned models are trained on, while
-*torso from the shoulders* joins each hip to its own shoulder and the two hips to each
-other, giving the trunk width. Anatomical, but no longer the trained convention, so it is
-worth an A/B rather than an assumption.
+drawn, and a *Clear pose clips* button with a running count of what is cached. The style
+applies to whichever model is selected — they differ in which points get found, the styles
+in what is done with them. Changing the style discards every rendered clip, since they were
+drawn the old way.
+
+| Style | |
+|---|---|
+| *OpenPose (standard)* | Both hips hang off the neck. The convention pose-conditioned models are trained on |
+| *OpenPose, torso from the shoulders* | Each hip joins its own shoulder and the two hips join each other, so the trunk is a closed shape with width. Anatomical, but no longer the trained convention — worth an A/B rather than an assumption |
+| *Solid figure* | Not the OpenPose convention at all: a filled trunk, a real head, black outlines so crossing limbs separate, and warm on the right against cool on the left. It works out which way the subject is facing and draws a face only when there is one to see; with the wholebody model it also draws the feet, which no other style does. For looking at rather than conditioning on |
+
+*Solid figure* exists because a 2D skeleton facing away is very nearly the mirror of one
+facing the camera, which makes a rendered clip hard to read. It votes on shoulder, hip and
+ear order — plus toe direction and face confidence when the wholebody model supplies them —
+smooths the verdict over the clip, and holds its last answer through a profile rather than
+flickering. The estimator will happily place a full set of eyes and a mouth on the back of
+a head, so the face is drawn from that verdict rather than from its own confidence.
 
 **Diagnostics → Export references** writes out exactly what the model is about to be
 given, into `reference_bundle/` beside the app: the reference files as they will be
@@ -502,7 +544,9 @@ as data rather than prose.
   sampling step. Long reference videos are the usual cause of an out-of-memory failure.
 - Reference video is assumed to be 24 fps and is not resampled; the app warns when a
   source's frame rate differs.
-- Generated state (`settings.json`, `ui_state.ini`, `runs/`, `scenes/`) lives beside the
-  app. Set `HARMON3_HOME` to relocate it.
+- Generated state lives beside the app and is not tracked in git: `settings.json`,
+  `ui_state.ini`, `scenes/`, `runs/`, `reference_bundle/` and the downloaded pose weights in
+  `models/`. All of it regenerates on first run. Set `HARMON3_HOME` to relocate it — useful
+  if the checkout is somewhere you would rather keep clean.
 - ComfyUI has no authentication. If it was started with `--listen` it is reachable from
   the local network; HARMON3 itself only talks to the address you configure.
